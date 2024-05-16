@@ -72,7 +72,7 @@ def Read(rmt_load,ser):
         # Wait for value to stabilize
         # Measure!
         print("Current Load:", load_Current)
-        time.sleep(.1)
+        time.sleep(.2)
         try:
             ser.flushInput()
             bs = ser.readline()  # Serial port Reading
@@ -81,6 +81,9 @@ def Read(rmt_load,ser):
             recv = js["current"]
             print("recv:", recv)
         except:
+            rmt_load.write(f''':SOUR:CURR:LEV:IMM {load_Current}''')  # sets Load Current
+            time.sleep(1)
+
             ser.flushInput()
             bs = ser.readline()  # Serial port Reading
             decod = (bs).decode('utf-8')  # Response decoding
