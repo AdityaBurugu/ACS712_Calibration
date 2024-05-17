@@ -6,23 +6,30 @@ import pandas as pd
 import datetime
 import os
 
-def Connection():
-    serial_status = load_status = rps_status = False
-    rmt_load = rmt_rps = ser = None
-    # Query if rmt_loadrument is present
+rm = pyvisa.ResourceManager()
+
+def Serial_Connection():
+    ser = None
     try:
         ser = serial.Serial("COM3", 9600)
-        serial_status=True
+        serial_status = True
     except:
         serial_status = False
 
+    return serial_status , ser
+
+def Load_Connection():
+    rmt_load = None
+    # Query if rmt_loadrument is present
     try:
-        rm = pyvisa.ResourceManager()
         rmt_load = rm.open_resource("RIGOL_DC_ELoad")  ####  TCPIP0::192.168.178.112::rmt_loadR
         print(rmt_load.query("*IDN?"))
-        load_status=True
+        load_status = True
     except:
-        load_status=False
+        load_status = False
+    return load_status,rmt_load
+
+def RPS_Connection():
     try:
         rmt_rps = rm.open_resource("LRPS")
         print(rmt_rps.query("*IDN?"))
@@ -30,9 +37,8 @@ def Connection():
     except:
         rps_status = False
 
-    return serial_status , load_status , rps_status , ser, rmt_load, rmt_rps
-
-def Initialise_Parameters(rmt_rps,rmt_load,INVolt):
+    return rps_status , rmt_rps
+def Initialise_Parameters(rmt_rps, rmt_load, INVolt):
     rmt_rps.write("*RST")  # Resets to Default Values
     time.sleep(1)
 
@@ -40,6 +46,9 @@ def Initialise_Parameters(rmt_rps,rmt_load,INVolt):
     time.sleep(1)
 
     rmt_rps.write(f''':VOLT {INVolt}''')  # Sets Voltage Level of RPS
+    time.sleep(.1)
+
+    rmt_rps.write(f''':CURR 5''')  # Sets Current Level of RPS
     time.sleep(.1)
 
     rmt_rps.write(":OUTP:STAT CH1,ON")  # Enable RPS
@@ -60,7 +69,8 @@ def Initialise_Parameters(rmt_rps,rmt_load,INVolt):
     rmt_load.write(":SOURCE:INPUT:STATE On")  # Enable electronic load
     time.sleep(.1)
 
-def Read(rmt_load,ser):
+
+def Read(rmt_load, ser):
     load_list = []
     recv_list = []
     cur = 0
@@ -102,6 +112,7 @@ def Read(rmt_load,ser):
 
     return load_list, recv_list
 
+
 def Save(pd_data):
     current_time = datetime.datetime.now().strftime("%d_%m_%y_%H_%M_%S")
 
@@ -120,23 +131,25 @@ def main():
     Input_Cases = [Val for Val in csv["input_voltage"]]
     sample_rates = [rates for rates in csv["samples"]]
 
-    serial_status, load_status, rps_status, ser, rmt_load, rmt_rps = Connection()
+    serial_status,ser = Serial_Connection()
+    rps_status, rmt_rps = RPS_Connection()
+    load_status,rmt_load = Load_Connection()
 
     for i in range(len(Input_Cases)):
         INVolt, sample_rate = Input_Cases[i], sample_rates[i]
-        print("*" * 10, "Voltage",INVolt, "*" * 10)
+        print("*" * 10, "Voltage", INVolt, "*" * 10)
 
         time.sleep(2)
         loadlist = []
         recvlist = []
-        if serial_status == True and  load_status == True and rps_status == True:
+        if serial_status == True and load_status == True and rps_status == True:
             if ser is not None and rmt_load is not None and rmt_rps is not None:
-                Initialise_Parameters(rmt_rps,rmt_load,INVolt)
+                Initialise_Parameters(rmt_rps, rmt_load, INVolt)
 
-            # Write to Pandas Data Frame
+                # Write to Pandas Data Frame
                 for _ in range(sample_rate):
-                    print("*"*10,"Sample",_+1,"*"*10)
-                    load,Vo = Read(rmt_load,ser)
+                    print("*" * 10, "Sample", _ + 1, "*" * 10)
+                    load, Vo = Read(rmt_load, ser)
                     loadlist.append(load)
                     recvlist.append(Vo)
 
@@ -144,7 +157,7 @@ def main():
                 pd_data = pd_data.assign(Load=loadlist)
 
                 for i in range(sample_rate):
-                    header = f'''Vo_{INVolt}V_{i+1}'''
+                    header = f'''Vo_{INVolt}V_{i + 1}'''
                     new_data = {header: recvlist[i]}
                     pd_data = pd_data.assign(**new_data)
                 print(pd_data)
@@ -156,10 +169,18 @@ def main():
         if rps_status == False:
             print("Cannot Connect to RIGOL_RPS")
 
-    Save(pd_data)
-    rmt_load.write(":SOURCE:INPUT:STATE Off")
-    time.sleep(2)
-    rmt_rps.write(":OUTP:STAT CH1,OFF")
 
-if __name__=="__main__":
+    Save(pd_data)
+
+    load_resp = int(rmt_load.query(":SOUR:INP:STAT?"))
+    if load_resp == 1:
+        rmt_load.write(":SOURCE:INPUT:STATE Off")
+        time.sleep(1)
+
+    rps_resp = rmt_rps.query(":OUTPut:STATe? CH1").strip()
+    if rps_resp == "ON":
+        rmt_rps.write(":OUTP:STAT CH1,OFF")
+
+
+if __name__ == "__main__":
     main()
