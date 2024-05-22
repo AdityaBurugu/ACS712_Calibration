@@ -8,6 +8,8 @@ import os
 
 rm = pyvisa.ResourceManager()
 
+EMPTY = (0,0)
+
 def Serial_Connection():
     ser = None
     try:
@@ -25,18 +27,24 @@ def Load_Connection():
         rmt_load = rm.open_resource("RIGOL_DC_ELoad")  ####  TCPIP0::192.168.178.112::rmt_loadR
         print(rmt_load.query("*IDN?"))
         load_status = True
-    except:
+    except(Exception, pyvisa.errors.Error) as error:
         load_status = False
+        print("Error-Code:", error.error_code)
+        print("Error-Abbreviation:", error.abbreviation)
+        print("Error-Description", error.description)
     return load_status,rmt_load
 
 def RPS_Connection():
+    rmt_rps = None
     try:
         rmt_rps = rm.open_resource("LRPS")
         print(rmt_rps.query("*IDN?"))
         rps_status = True
-    except:
+    except(Exception, pyvisa.errors.Error) as error:
         rps_status = False
-
+        print("Error-Code:", error.error_code)
+        print("Error-Abbreviation:", error.abbreviation)
+        print("Error-Description", error.description)
     return rps_status , rmt_rps
 def Initialise_Parameters(rmt_rps, rmt_load, INVolt):
     rmt_rps.write("*RST")  # Resets to Default Values
@@ -170,16 +178,23 @@ def main():
             print("Cannot Connect to RIGOL_RPS")
 
 
-    Save(pd_data)
+    if pd_data.shape != EMPTY:
+        Save(pd_data)
 
-    load_resp = int(rmt_load.query(":SOUR:INP:STAT?"))
-    if load_resp == 1:
-        rmt_load.write(":SOURCE:INPUT:STATE Off")
-        time.sleep(1)
+    if serial_status == True:
+        ser.close()
 
-    rps_resp = rmt_rps.query(":OUTPut:STATe? CH1").strip()
-    if rps_resp == "ON":
-        rmt_rps.write(":OUTP:STAT CH1,OFF")
+    if load_status == True:
+        load_resp = int(rmt_load.query(":SOUR:INP:STAT?"))
+        if load_resp == 1:
+            rmt_load.write(":SOURCE:INPUT:STATE Off")
+            time.sleep(1)
+
+    if rps_status == True:
+        rps_resp = rmt_rps.query(":OUTPut:STATe? CH1").strip()
+        if rps_resp == "ON":
+            rmt_rps.write(":OUTP:STAT CH1,OFF")
+            time.sleep(1)
 
 
 if __name__ == "__main__":
