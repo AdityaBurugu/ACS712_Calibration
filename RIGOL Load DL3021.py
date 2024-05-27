@@ -6,7 +6,11 @@ import pandas as pd
 import datetime
 import os
 
-rm = pyvisa.ResourceManager()
+rm=None
+try:
+    rm = pyvisa.ResourceManager()
+except Exception as e:
+    print(e)
 
 EMPTY = (0,0)
 
@@ -24,32 +28,34 @@ def Serial_Connection():
     return serial_status,ser
 
 def Load_Connection():
-    rmt_load = None
-    # Query if rmt_loadrument is present
-    try:
-        rmt_load = rm.open_resource("RIGOL_DC_ELoad")  ####  TCPIP0::192.168.178.112::rmt_loadR
-        print(rmt_load.query("*IDN?"))
-        load_status = True
-    except(Exception, pyvisa.errors.Error) as error:
-        load_status = False
-        print("Load Connection")
-        print("Error-Code:", error.error_code)
-        print("Error-Abbreviation:", error.abbreviation)
-        print("Error-Description:", error.description)
+    rmt_load = load_status = None
+    # Query if rmt_load instrument is present
+    if rm:
+        try:
+            rmt_load = rm.open_resource("RIGOL_DC_ELoad")  ####  TCPIP0::192.168.178.112::rmt_loadR
+            print(rmt_load.query("*IDN?"))
+            load_status = True
+        except(Exception, pyvisa.errors.Error) as error:
+            load_status = False
+            print("Load Connection")
+            print("Error-Code:", error.error_code)
+            print("Error-Abbreviation:", error.abbreviation)
+            print("Error-Description:", error.description)
     return load_status,rmt_load
 
 def RPS_Connection():
-    rmt_rps = None
-    try:
-        rmt_rps = rm.open_resource("LRPS")
-        print(rmt_rps.query("*IDN?"))
-        rps_status = True
-    except(Exception, pyvisa.errors.Error) as error:
-        rps_status = False
-        print("RPS Connection")
-        print("Error-Code:", error.error_code)
-        print("Error-Abbreviation:", error.abbreviation)
-        print("Error-Description:", error.description)
+    rmt_rps= rps_status = None
+    if rm:
+        try:
+            rmt_rps = rm.open_resource("LRPS")
+            print(rmt_rps.query("*IDN?"))
+            rps_status = True
+        except(Exception, pyvisa.errors.Error) as error:
+            rps_status = False
+            print("RPS Connection")
+            print("Error-Code:", error.error_code)
+            print("Error-Abbreviation:", error.abbreviation)
+            print("Error-Description:", error.description)
     return rps_status , rmt_rps
 
 def Initialise_Parameters(rmt_rps, rmt_load, INVolt):
