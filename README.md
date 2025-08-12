@@ -1,2 +1,1 @@
-E32 Module Automated Programming
-
+Automation of ACS712 Current Sensor Calibration using Python
